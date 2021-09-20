@@ -1,0 +1,13 @@
+#include "iostream.bah"
+#include "html.bah"
+
+main(args []cpstring) int {
+    fm = fileMap{}
+    page = fm.open("test.html")
+    fm.close()
+    doc = parseHTML(page)
+    elems = doc.find("html body h1")
+    html = elems[0]
+    println(html.html)
+    return 0
+}

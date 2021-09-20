@@ -1,0 +1,248 @@
+#include "iostream.bah"
+
+//TODO: tags that does not need to be closed (meta, img....)
+//TODO: tags that does not contain inner html (script)
+
+struct htmlElement {
+    name: cpstring
+    attrs: []cpstring
+    html: cpstring = ""
+    text: cpstring = ""
+    children: []htmlElement*
+
+    //Used for finding a children of the element corresponding to the specified query.
+    find(q cpstring) []htmlElement* {
+        elems = []htmlElement*
+        tag cpstring
+        qs = string(q)
+        if qs.count(" ") > 0 {
+            tag = splitStringBefore(qs, " ")
+        } else {
+            tag = q
+        }
+        fc = cpstringCharAt(tag, 0)
+        i=0; for i < len(this.children) {
+            c = this.children[i]
+            if fc == '#' {
+
+            } else if fc == '.' {
+
+            } else {
+                if c.name == tag {
+                    qs.trimLeft(strlen(tag))
+                    qs.trim()
+                    if qs.length > 0 {
+                        elems = c.find(qs.str())
+                    } else {
+                        elems[len(elems)] = c
+                    }
+                }
+            }
+            i = i + 1
+        }
+        return elems
+    }
+
+    //Used for getting the content of the specified attribute.
+    attr(name cpstring) cpstring {
+        i=0; for i < len(this.attrs) {
+            attr = string(this.attrs[i])
+            attrName cpstring
+            if attr.count("=") > 0 {
+                attrName = splitStringBefore(attr, "=")
+                if attrName == name {
+                    attr.trimLeft(strlen(attrName) + 1)
+                    return attr.str()
+                }
+            } else if attr.compare(name) == 1 {
+                return "true"
+            }
+            i = i + 1
+        }
+        return ""
+    }
+
+}
+
+//Returns true if the char is either a letter, '-' or '_'
+//*Note: this is an internal function.*
+isValidHTMLStringChar(c char) bool {
+ return isLetter(c) == 1 || c == '-' || c == '_' || isNumber(c)
+}
+
+//Used for skipping white spaces inside the current char array.
+//*Note: this is an internal function.*
+skipHTMLspace(s []char, i int) int {
+    for i < len(s) {
+        if isSpace(s[i]) == 0 {
+            break
+        }
+        i = i + 1
+    }
+    return i
+}
+
+//Used for parsing a string. Will return an array of elements.
+//*Note: this is an internal function, if you are trying to parse a document, use parseHTML().*
+parseHTMLElements(s []char) []htmlElement* {
+
+    elems = []htmlElement*
+
+    nonClosingTags = []cpstring{"meta", "img"}
+    nonParsingTags = []cpstring{"script"}
+
+    i=0; for i < len(s) {
+        c = s[i]
+        
+        //parsing element
+        if c == '<' {
+            elem = new htmlElement
+            name = []char
+            i = i + 1
+            
+            //parsing name
+            for i < len(s) {
+                c = s[i]
+                if isValidHTMLStringChar(c) == false {
+                    break
+                }
+                name[len(name)] = c
+                i = i + 1
+            }
+            elem.name = arrToStr(name)
+            
+            //parsing attributes
+            i = skipHTMLspace(s, i)
+            if s[i] != '>' {
+                currentAttr = []char
+                for i < len(s) {
+                    c = s[i]
+                    
+                    //current attribute is a string
+                    if len(currentAttr) > 0 && c == <char>34 {
+                        i = i + 1
+                        for i < len(s) {
+                            c = s[i]
+                            if c == <char>34 && s[i-1] != <char>92 {
+                                i = i + 1
+                                break
+                            }
+                            currentAttr[len(currentAttr)] = c
+                            i = i + 1
+                        }
+                    }
+
+                    //char is no longer part of an attribute
+                    if isValidHTMLStringChar(c) == false {
+                        i = skipHTMLspace(s, i)
+                        c = s[i]
+                        if c != '=' {
+                            elem.attrs[len(elem.attrs)] = arrToStr(currentAttr)
+                            clear(currentAttr)
+                        }
+                        i = skipHTMLspace(s, i)
+                    }
+
+                    //end of opening tag
+                    if c == '>' {
+                        break
+                    }
+
+                    currentAttr[len(currentAttr)] = c
+                    i = i + 1
+                }
+            }
+            
+            //parsing inner element (html content of the current element)
+            content = []char
+            text = []char
+            nbTags = 1
+            foundTag = false
+            i = i + 1
+            for i < len(s) {
+                c = s[i]
+
+                //handling tag
+                if c == '<' {
+                    foundTag = true
+                    i = skipHTMLspace(s, i) + 1
+                    c = s[i]
+                    if c == '/' {
+                        nbTags = nbTags - 1
+                    } else {
+                        nbTags = nbTags + 1
+                    }
+                    if nbTags > 0 {
+                        content[len(content)] = '<'
+                    }
+                    for i < len(s) {
+                        c = s[i]
+                        //escaping strings
+                        if c == <char>34 {
+                            for i < len(s) {
+                                c = s[i]
+                                if nbTags > 0 {
+                                    content[len(content)] = c
+                                }
+                                if c == <char>34 && s[i-1] != <char>92 {
+                                    break
+                                }
+                                i = i + 1
+                            }
+                            i = i + 1
+                            continue
+                        }
+                        //closing tag
+                        if c == '>' {
+                            break
+                        }
+                        if nbTags > 0 {
+                            content[len(content)] = c
+                        }
+                        i = i + 1
+                    }
+                    if nbTags != 0 {
+                        content[len(content)] = s[i]
+                        i = i + 1
+                        continue
+                    }
+                }
+
+                if nbTags == 0 {
+                    break
+                }
+
+                content[len(content)] = c
+                text[len(text)] = c
+                i = i + 1
+            }
+
+            elem.text = arrToStr(text)
+            elem.html = arrToStr(content)
+            if foundTag == true {
+                elem.children = parseHTMLElements(content)
+            }
+
+
+            elems[len(elems)] = elem
+        }
+
+
+        i = i + 1
+    }
+
+    return elems
+
+}
+
+//Used for parsing a HTML document.
+//Will return a pointer to the document.
+parseHTML(doc cpstring) htmlElement* {
+    root = new htmlElement
+    root.name = "document"
+
+    root.children = parseHTMLElements(strAsArr(doc))
+
+
+    return root
+}
