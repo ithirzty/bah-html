@@ -6,8 +6,8 @@ main(args []cpstring) int {
     page = fm.open("test.html")
     fm.close()
     doc = parseHTML(page)
-    elems = doc.find("html body h1")
+    elems = doc.find("html")
     html = elems[0]
-    println(html.html)
+    println(html.text)
     return 0
 }

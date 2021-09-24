@@ -185,9 +185,10 @@ parseHTMLElements(s []char) []htmlElement* {
                         stage = 3
                         nameIndex = nameIndex + 1
                         buff[len(buff)] = c
-                    } else if stage == 3 && c == '>'
+                    } else if stage == 3 && c == '>' {
                     content[len(content)] = c
                     i = i + 1
+                    }
                 }
             } else {
                 for i < len(s) {
