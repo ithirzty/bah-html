@@ -1,6 +1,6 @@
 #include "iostream.bah"
 
-//TODO: tags that does not need to be closed (meta, img....)
+//TODO: optionnal closing tag
 //TODO: tags that does not contain inner html (script)
 
 struct htmlElement {
@@ -89,7 +89,7 @@ parseHTMLElements(s []char) []htmlElement* {
     elems = []htmlElement*
 
     nonClosingTags = []cpstring{"meta", "img"}
-    nonParsingTags = []cpstring{"script"}
+    nonParsingTags = []cpstring{"script", "style"}
 
     i=0; for i < len(s) {
         c = s[i]
@@ -154,67 +154,117 @@ parseHTMLElements(s []char) []htmlElement* {
             }
             
             //parsing inner element (html content of the current element)
+            needsParsing = true
+            j=0; for j < len(nonParsingTags) {
+                if nonParsingTags[j] == arrAsStr(name) {
+                    needsParsing = false
+                    break
+                }
+                j = j + 1
+            }
+
+
             content = []char
             text = []char
             nbTags = 1
             foundTag = false
             i = i + 1
-            for i < len(s) {
-                c = s[i]
-
-                //handling tag
-                if c == '<' {
-                    foundTag = true
-                    i = skipHTMLspace(s, i) + 1
+            if needsParsing == false {
+                nameIndex = 0
+                buff = []char
+                stage = 0
+                for i < len(s) {
                     c = s[i]
-                    if c == '/' {
-                        nbTags = nbTags - 1
-                    } else {
-                        nbTags = nbTags + 1
-                    }
-                    if nbTags > 0 {
-                        content[len(content)] = '<'
-                    }
-                    for i < len(s) {
+                    if stage == 0 && c == '<' {
+                        stage = 1
+                        buff[len(buff)] = c
+                    } else if stage == 1 && c == '/' {
+                        stage = 2
+                        buff[len(buff)] = c
+                    } else if stage == 2 && c == name[nameIndex] {
+                        stage = 3
+                        nameIndex = nameIndex + 1
+                        buff[len(buff)] = c
+                    } else if stage == 3 && c == '>'
+                    content[len(content)] = c
+                    i = i + 1
+                }
+            } else {
+                for i < len(s) {
+                    c = s[i]
+
+                    //handling tag
+                    if c == '<' {
+                        foundTag = true
+                        i = skipHTMLspace(s, i) + 1
                         c = s[i]
-                        //escaping strings
-                        if c == <char>34 {
-                            for i < len(s) {
-                                c = s[i]
-                                if nbTags > 0 {
-                                    content[len(content)] = c
-                                }
-                                if c == <char>34 && s[i-1] != <char>92 {
+                        if c == '/' {
+                            nbTags = nbTags - 1
+                        } else {
+                            j = skipHTMLspace(s, i)
+                            name = []char
+                            for j < len(s) {
+                                nc = s[j]
+                                if isValidHTMLStringChar(nc) == false {
                                     break
                                 }
-                                i = i + 1
+                                name[len(name)] = nc
+                                j = j + 1
                             }
+                            
+                            j=0; for j < len(nonClosingTags) {
+                                if nonClosingTags[j] == arrAsStr(name) {
+                                    nbTags = nbTags - 1
+                                    break
+                                }
+                                j = j + 1
+                            }
+                            nbTags = nbTags + 1
+                        }
+                        if nbTags > 0 {
+                            content[len(content)] = '<'
+                        }
+                        for i < len(s) {
+                            c = s[i]
+                            //escaping strings
+                            if c == <char>34 {
+                                for i < len(s) {
+                                    c = s[i]
+                                    if nbTags > 0 {
+                                        content[len(content)] = c
+                                    }
+                                    if c == <char>34 && s[i-1] != <char>92 {
+                                        break
+                                    }
+                                    i = i + 1
+                                }
+                                i = i + 1
+                                continue
+                            }
+                            //closing tag
+                            if c == '>' {
+                                break
+                            }
+                            if nbTags > 0 {
+                                content[len(content)] = c
+                            }
+                            i = i + 1
+                        }
+                        if nbTags != 0 {
+                            content[len(content)] = s[i]
                             i = i + 1
                             continue
                         }
-                        //closing tag
-                        if c == '>' {
-                            break
-                        }
-                        if nbTags > 0 {
-                            content[len(content)] = c
-                        }
-                        i = i + 1
                     }
-                    if nbTags != 0 {
-                        content[len(content)] = s[i]
-                        i = i + 1
-                        continue
+
+                    if nbTags == 0 {
+                        break
                     }
-                }
 
-                if nbTags == 0 {
-                    break
+                    content[len(content)] = c
+                    text[len(text)] = c
+                    i = i + 1
                 }
-
-                content[len(content)] = c
-                text[len(text)] = c
-                i = i + 1
             }
 
             elem.text = arrToStr(text)
